@@ -613,7 +613,7 @@ section { padding: 90px 0; position: relative; }
   padding: 40px;
   display: grid; grid-template-columns: 1.2fr 1fr; gap: 30px; align-items: center;
 }
-.subscribe form { display: flex; gap: 10px; }
+.subscribe form { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .subscribe input[type=email] {
   flex: 1;
   padding: 14px 16px;
@@ -624,6 +624,23 @@ section { padding: 90px 0; position: relative; }
   font-size: 1rem;
 }
 .subscribe input[type=email]:focus { outline: none; border-color: var(--blue-bright); }
+.subscribe #subscribe-msg {
+  grid-column: 1 / -1;
+  margin-top: 16px;
+  color: var(--text-muted);
+  font-size: .95rem;
+  display: block;
+  opacity: 0;
+  transform: translateY(-8px);
+  max-height: 0;
+  overflow: hidden;
+  transition: opacity .28s ease, transform .28s ease, max-height .3s ease;
+}
+.subscribe #subscribe-msg.visible {
+  opacity: 1;
+  transform: translateY(0);
+  max-height: 200px;
+}
 @media (max-width: 800px) { .subscribe { grid-template-columns: 1fr; } }
 
 /* ===================== Reveal animations ===================== */

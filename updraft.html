@@ -102,7 +102,8 @@
 
       <article class="post-card reveal">
         <div class="post-thumb">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0z"/><path d="M8 12l3 3 5-7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <!-- <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0z"/><path d="M8 12l3 3 5-7" stroke-linecap="round" stroke-linejoin="round"/></svg> -->
+           <img src="assets/updraft/NAP-Consistency.jpg" alt="Monthly Reporting" />
         </div>
         <div class="post-body">
           <span class="post-tag">Citations</span>
@@ -120,10 +121,11 @@
         <h2 style="margin:0 0 8px;">Catch every Updraft.</h2>
         <p style="margin:0;">One short, useful email per week. No spam, no funnels, just tactics that work.</p>
       </div>
-      <form onsubmit="event.preventDefault(); this.querySelector('input').value=''; this.querySelector('.btn').textContent='Subscribed ✓';">
-        <input type="email" placeholder="you@business.com" required />
+      <form id="subscribe-form">
+        <input type="email" id="subscribe-email" placeholder="you@business.com" required />
         <button class="btn btn-primary" type="submit">Subscribe</button>
       </form>
+      <p id="subscribe-msg"></p>
     </div>
   </div>
 </section>
