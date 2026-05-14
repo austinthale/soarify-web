@@ -21,6 +21,16 @@
     </button>
     <nav class="nav">
       <a href="index.html">Home</a>
+      <div class="nav-dropdown">
+        <button class="nav-dropdown-toggle">Services</button>
+        <div class="nav-dropdown-menu">
+          <a href="services/google-business-profile-optimization.html">GBP Optimization</a>
+          <a href="services/website-design-local-business.html">Website Building</a>
+          <a href="services/reputation-management.html">Reputation Management</a>
+          <a href="services/local-services-ads.html">Local Services Ads</a>
+          <a href="services/social-media-management.html">Social Media Management</a>
+        </div>
+      </div>
       <a href="about.html">About</a>
       <a href="updraft.html" class="active">The Updraft</a>
       <a href="contact.html" class="nav-cta">Free GBP Audit</a>
@@ -102,7 +112,8 @@
 
       <article class="post-card reveal">
         <div class="post-thumb">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0z"/><path d="M8 12l3 3 5-7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <!-- <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0z"/><path d="M8 12l3 3 5-7" stroke-linecap="round" stroke-linejoin="round"/></svg> -->
+           <img src="assets/updraft/NAP-Consistency.jpg" alt="Monthly Reporting" />
         </div>
         <div class="post-body">
           <span class="post-tag">Citations</span>
@@ -120,10 +131,11 @@
         <h2 style="margin:0 0 8px;">Catch every Updraft.</h2>
         <p style="margin:0;">One short, useful email per week. No spam, no funnels, just tactics that work.</p>
       </div>
-      <form onsubmit="event.preventDefault(); this.querySelector('input').value=''; this.querySelector('.btn').textContent='Subscribed ✓';">
-        <input type="email" placeholder="you@business.com" required />
+      <form id="subscribe-form">
+        <input type="email" id="subscribe-email" placeholder="you@business.com" required />
         <button class="btn btn-primary" type="submit">Subscribe</button>
       </form>
+      <p id="subscribe-msg"></p>
     </div>
   </div>
 </section>
@@ -139,6 +151,7 @@
         <h4>Explore</h4>
         <ul>
           <li><a href="index.html">Home</a></li>
+          <li><a href="services.html">Services</a></li>
           <li><a href="about.html">About</a></li>
           <li><a href="updraft.html">The Updraft</a></li>
           <li><a href="contact.html">Contact</a></li>
@@ -147,10 +160,11 @@
       <div>
         <h4>Services</h4>
         <ul>
-          <li><a href="index.html#free-gbp-audit">Free GBP Audit</a></li>
-          <li><a href="index.html#profile-optimization">Profile Optimization</a></li>
-          <li><a href="index.html#monthly-management">Monthly Management</a></li>
-          <li><a href="index.html#monthly-reporting">Reporting</a></li>
+          <li><a href="services.html#gbp-optimization">GBP Optimization</a></li>
+          <li><a href="services.html#website-building">Website Building</a></li>
+          <li><a href="services.html#reputation-management">Reputation Management</a></li>
+          <li><a href="services.html#local-services-ads">Local Services Ads</a></li>
+          <li><a href="services.html#social-media-management">Social Media Management</a></li>
         </ul>
       </div>
     </div>

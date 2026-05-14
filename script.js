@@ -6,6 +6,37 @@ document.addEventListener("DOMContentLoaded", () => {
     toggle.addEventListener("click", () => nav.classList.toggle("open"));
   }
 
+  // Dropdown menu toggle
+  const navDropdowns = document.querySelectorAll(".nav-dropdown");
+  navDropdowns.forEach(dropdown => {
+    const button = dropdown.querySelector(".nav-dropdown-toggle");
+    const menu = dropdown.querySelector(".nav-dropdown-menu");
+    if (button && menu) {
+      button.addEventListener("click", (e) => {
+        e.preventDefault();
+        dropdown.classList.toggle("active");
+        // Close other dropdowns
+        navDropdowns.forEach(other => {
+          if (other !== dropdown) other.classList.remove("active");
+        });
+      });
+      // Close dropdown when a link is clicked
+      menu.querySelectorAll("a").forEach(link => {
+        link.addEventListener("click", () => {
+          dropdown.classList.remove("active");
+        });
+      });
+    }
+  });
+  // Close dropdown when clicking outside
+  document.addEventListener("click", (e) => {
+    navDropdowns.forEach(dropdown => {
+      if (!dropdown.contains(e.target)) {
+        dropdown.classList.remove("active");
+      }
+    });
+  });
+
   // Reveal-on-scroll
   const io = new IntersectionObserver(
     (entries) => {
@@ -56,73 +87,73 @@ document.addEventListener("DOMContentLoaded", () => {
 	 
 	// ─── Contact form ─────────────────────────────────────────────────────────────
 	const form      = document.getElementById("contact-form");
-	const success   = document.querySelector(".form-success");
-	const submitBtn = form.querySelector('[type="submit"]');
+	if (form) {
+	  const success   = document.querySelector(".form-success");
+	  const submitBtn = form.querySelector('[type="submit"]');
 	 
-	form.addEventListener("submit", async (e) => {
-	  e.preventDefault();
+	  form.addEventListener("submit", async (e) => {
+		 e.preventDefault();
 	 
-	  // Basic client-side validation
-	  if (!form.checkValidity()) {
-		form.reportValidity();
-		return;
+		 // Basic client-side validation
+		 if (!form.checkValidity()) {
+		   form.reportValidity();
+		   return;
+		 }
+	 
+		 // Loading state
+		 const originalText = submitBtn.innerHTML;
+		 submitBtn.disabled  = true;
+		 submitBtn.innerHTML = "Sending… <span class='arrow'>→</span>";
+	 
+		 try {
+		   const res = await fetch(FORMSPREE_URL, {
+			 method:  "POST",
+			 headers: {
+			   "Content-Type": "application/json",
+			   "Accept":       "application/json",
+			 },
+			 body: JSON.stringify(Object.fromEntries(new FormData(form))),
+		   });
+	 
+		   const data = await res.json();
+	 
+		   if (res.ok) {
+			 // Success — show message, hide form fields
+			 form.querySelectorAll(".form-row, .form-group, [type='submit']")
+				 .forEach(el => (el.style.display = "none"));
+			 success.style.display = "block";
+			 form.reset();
+		   } else {
+			 // Formspree returned a validation error (e.g. spam detected)
+			 const msg = data?.errors?.map(err => err.message).join(", ")
+				 || "Something went wrong. Please try again.";
+			 showError(msg);
+			 resetButton(submitBtn, originalText);
+		   }
+		 } catch {
+		   // Network failure
+		   showError("Could not send your request — check your connection and try again.");
+		   resetButton(submitBtn, originalText);
+		 }
+	  });
+	 
+	  // ─── Helpers ──────────────────────────────────────────────────────────────────
+	  function showError(msg) {
+		 let el = document.getElementById("form-error");
+		 if (!el) {
+		   el = document.createElement("p");
+		   el.id = "form-error";
+		   el.style.cssText = "color:var(--color-danger,#c0392b);font-size:.9rem;margin-top:12px;text-align:center;";
+		   form.appendChild(el);
+		 }
+		 el.textContent = msg;
 	  }
-	 
-	  // Loading state
-	  const originalText = submitBtn.innerHTML;
-	  submitBtn.disabled  = true;
-	  submitBtn.innerHTML = "Sending… <span class='arrow'>→</span>";
-	 
-	  try {
-		const res = await fetch(FORMSPREE_URL, {
-		  method:  "POST",
-		  headers: {
-			"Content-Type": "application/json",
-			"Accept":       "application/json",
-		  },
-		  body: JSON.stringify(Object.fromEntries(new FormData(form))),
-		});
-	 
-		const data = await res.json();
-	 
-		if (res.ok) {
-		  // Success — show message, hide form fields
-		  form.querySelectorAll(".form-row, .form-group, [type='submit']")
-			  .forEach(el => (el.style.display = "none"));
-		  success.style.display = "block";
-		  form.reset();
-		} else {
-		  // Formspree returned a validation error (e.g. spam detected)
-		  const msg = data?.errors?.map(err => err.message).join(", ")
-				   || "Something went wrong. Please try again.";
-		  showError(msg);
-		  resetButton(submitBtn, originalText);
-		}
-	  } catch {
-		// Network failure
-		showError("Could not send your request — check your connection and try again.");
-		resetButton(submitBtn, originalText);
+	 	 
+	  function resetButton(btn, originalHTML) {
+		 btn.disabled   = false;
+		 btn.innerHTML  = originalHTML;
 	  }
-	});
-	 
-	// ─── Helpers ──────────────────────────────────────────────────────────────────
-	function showError(msg) {
-	  let el = document.getElementById("form-error");
-	  if (!el) {
-		el = document.createElement("p");
-		el.id = "form-error";
-		el.style.cssText = "color:var(--color-danger,#c0392b);font-size:.9rem;margin-top:12px;text-align:center;";
-		form.appendChild(el);
-	  }
-	  el.textContent = msg;
-	}
-	 
-	function resetButton(btn, originalHTML) {
-	  btn.disabled   = false;
-	  btn.innerHTML  = originalHTML;
-	}
-	 
-	// ─── Scroll reveal (keep if you already use this) ─────────────────────────────
+}
 	const revealEls = document.querySelectorAll(".reveal");
 	if (revealEls.length && "IntersectionObserver" in window) {
 	  const observer = new IntersectionObserver(
@@ -136,4 +167,49 @@ document.addEventListener("DOMContentLoaded", () => {
 	  );
 	  revealEls.forEach(el => observer.observe(el));
 	}
+
+
+	// ── Newsletter subscribe ───────────────────────────────────────────────────────
+	const MAILCHIMP_URL = "https://soarify.us15.list-manage.com/subscribe/post-json?u=d9d5ee80eef8e29dd5862dac7&id=e8bfee51f3";
+
+	const subForm = document.getElementById("subscribe-form");
+	const subMsg  = document.getElementById("subscribe-msg");
+
+	if (subForm) {
+	subForm.addEventListener("submit", async (e) => {
+		e.preventDefault();
+		const email = document.getElementById("subscribe-email").value;
+		const btn   = subForm.querySelector(".btn");
+
+		btn.disabled    = true;
+		btn.textContent = "Subscribing…";
+
+		// Mailchimp requires JSONP for cross-origin — use a script tag trick
+		const script = document.createElement("script");
+		const cb     = "mcCallback_" + Date.now();
+
+		window[cb] = (data) => {
+		script.remove();
+		delete window[cb];
+		subMsg.classList.add("visible");
+		if (data.result === "success") {
+			subForm.querySelector("input").value = "";
+			btn.textContent   = "Subscribed ✓";
+			subMsg.style.color = "var(--accent, #1D9E75)";
+			subMsg.textContent = "You're in! We'll email you when a new post drops.";
+		} else {
+			btn.disabled    = false;
+			btn.textContent = "Subscribe";
+			subMsg.style.color = "#e05c5c";
+			subMsg.textContent = data.msg.includes("already subscribed")
+			? "You're already subscribed!"
+			: "Something went wrong — please try again.";
+		}
+		};
+
+		script.src = `${MAILCHIMP_URL}&EMAIL=${encodeURIComponent(email)}&c=${cb}`;
+		document.body.appendChild(script);
+  });
+}
+
 });
