@@ -9,13 +9,13 @@ Soarify-web is a lightweight, frontend-focused website built with HTML, CSS, and
 ## 📁 Project Structure
 
 soarify-web/
-├── index.html          # Home page
-├── about.html          # About page
-├── blog.html           # Blog page
-├── contact.html        # Contact page
-├── css/                # Stylesheets
-├── js/                 # JavaScript files
-└── README.md           # This file
+- ├── index.html&emsp;&emsp;# Home page
+- ├── about.html&emsp;&emsp;# About page
+- ├── blog.html&emsp;&emsp;# Blog page
+- ├── contact.html&emsp;# Contact page
+- ├── css/&emsp;&emsp;&emsp;# Stylesheets
+- ├── js/&emsp;&emsp;&emsp;# JavaScript files
+- └── README.md&emsp;&emsp;# This file
 
 ## ✨ Features
 
