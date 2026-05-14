@@ -6,6 +6,37 @@ document.addEventListener("DOMContentLoaded", () => {
     toggle.addEventListener("click", () => nav.classList.toggle("open"));
   }
 
+  // Dropdown menu toggle
+  const navDropdowns = document.querySelectorAll(".nav-dropdown");
+  navDropdowns.forEach(dropdown => {
+    const button = dropdown.querySelector(".nav-dropdown-toggle");
+    const menu = dropdown.querySelector(".nav-dropdown-menu");
+    if (button && menu) {
+      button.addEventListener("click", (e) => {
+        e.preventDefault();
+        dropdown.classList.toggle("active");
+        // Close other dropdowns
+        navDropdowns.forEach(other => {
+          if (other !== dropdown) other.classList.remove("active");
+        });
+      });
+      // Close dropdown when a link is clicked
+      menu.querySelectorAll("a").forEach(link => {
+        link.addEventListener("click", () => {
+          dropdown.classList.remove("active");
+        });
+      });
+    }
+  });
+  // Close dropdown when clicking outside
+  document.addEventListener("click", (e) => {
+    navDropdowns.forEach(dropdown => {
+      if (!dropdown.contains(e.target)) {
+        dropdown.classList.remove("active");
+      }
+    });
+  });
+
   // Reveal-on-scroll
   const io = new IntersectionObserver(
     (entries) => {
