@@ -580,15 +580,87 @@ section { padding: 90px 0; position: relative; }
   display: grid; grid-template-columns: 1.2fr 1fr;
   gap: 50px; align-items: center;
 }
-.about-grid .img-card {
+.carousel-card {
   aspect-ratio: 1;
   border-radius: var(--radius-lg);
   background: var(--grad-soft);
   border: 1px solid var(--border-strong);
-  display: grid; place-items: center;
-  padding: 40px;
+  overflow: hidden;
+  position: relative;
 }
-.about-grid .img-card img { max-width: 80%; height: auto; }
+.carousel-inner {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+.carousel-item {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 0.6s ease-in-out;
+}
+.carousel-item.active {
+  opacity: 1;
+}
+.carousel-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.carousel-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
+  color: #fff;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  transition: background 0.2s ease;
+}
+.carousel-btn:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+.carousel-btn svg {
+  width: 24px;
+  height: 24px;
+}
+.carousel-prev {
+  left: 16px;
+}
+.carousel-next {
+  right: 16px;
+}
+.carousel-indicators {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  z-index: 10;
+}
+.carousel-indicators .indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.carousel-indicators .indicator.active {
+  background: rgba(255, 255, 255, 1);
+}
 
 .values-grid {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px;
