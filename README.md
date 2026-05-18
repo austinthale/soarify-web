@@ -7,7 +7,7 @@ A modern, responsive website for Soarify featuring Home, About, Blog, and Contac
 Soarify-web is a lightweight, frontend-focused website built with HTML, CSS, and JavaScript. The site is designed to be fast, accessible, and easy to maintain.
 
 ## 📁 Project Structure
-
+```
 soarify-web/
 ├── index.html          # Home page
 ├── about.html          # About page
@@ -16,7 +16,7 @@ soarify-web/
 ├── css/                # Stylesheets
 ├── js/                 # JavaScript files
 └── README.md           # This file
-
+```
 ## ✨ Features
 
 - Responsive design for mobile, tablet, and desktop
