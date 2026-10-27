@@ -1,0 +1,1482 @@
+// ========== GLOBAL VARIABLES & CONSTANTS ==========
+// Declare variables in global scope so they're accessible to all functions
+
+let saDyoHeaderInsertionCount = 0;
+let saDyoHeaderTitleTagCount = 0;
+let saDyoHeaderMetaTagCount = 0;
+let saDyoBodyHtmlTopInsertionCount = 0;
+let saDyoBodyHtmlBottomInsertionCount = 0;
+let saDyoLinksUpdationCount = 0;
+let saDyoImagesAltsUpdationCount = 0;
+let saDyoFooterHtmlInsertionCount = 0;
+let saDyoHydrationReady = false;
+let saDyoInitialApplyDone = false;
+
+const SA_BASE_API_ROUTE_PROD = 'https://sa.searchatlas.com/api/v2';
+const SA_BASE_API_ROUTE_STAGING = 'https://sa.staging.searchatlas.com/api/v2';
+const saDyoHeadersUpdationCount = {h1: 0, h2: 0, h3: 0, h4: 0, h5: 0, h6: 0};
+
+// ========== SANDBOXED CONTEXT DETECTION & REAL URL HELPERS ==========
+// Third-party script managers (Partytown, Cloudflare Zaraz, GTM custom
+// templates, iframe-based loaders, service-worker proxies, etc.) may execute
+// scripts inside sandboxed iframes or workers where window.location does NOT
+// reflect the actual page URL. These helpers detect that and resolve the real URL.
+
+// Cached result — sandbox status never changes during a page's lifecycle
+let _saDyoSandboxDetected = null;
+
+// Regex patterns for known sandbox/proxy URL paths.
+// Using word-boundary-aware regexes to avoid false positives on real page
+// paths like "/social-worker-resources/" or "/sandbox-toys/".
+const SA_DYO_SANDBOX_PATTERNS = [
+  /[/~]partytown[/-]/i, // Builder.io Partytown  e.g. /~partytown/sandbox-sw.html
+  /\/zaraz\//i, // Cloudflare Zaraz      e.g. /cdn-cgi/zaraz/
+  /\/gtm-msr\b/i, // GTM sandboxed mode    e.g. /gtm-msr.js
+  /-sandbox-sw\.html/i, // Service-worker sandbox e.g. partytown-sandbox-sw.html
+  /partytown-proxy\b/i, // Partytown PHP proxy   e.g. /partytown-proxy.php
+  /\/script-proxy[/.]/i, // Generic script proxy  e.g. /script-proxy.php?url=
+];
+
+/**
+ * Detects if the script is running inside a sandboxed/proxied context
+ * where window.location may not reflect the actual page URL.
+ *
+ * Detection strategy (ordered from most-reliable to least):
+ *   1. URL pattern matching — checks if window.location looks like a
+ *      sandbox/proxy path (no false positives on normal pages)
+ *   2. Same-origin iframe check — if we're in an iframe AND the top
+ *      window has a different pathname, it's a sandbox iframe
+ *   3. document.baseURI mismatch — some sandboxes set baseURI to the
+ *      real page URL while running from a different location
+ *
+ * Result is cached after first call.
+ *
+ * @return {boolean} true if running in a sandboxed context
+ */
+const isSandboxedContext = () => {
+  if (_saDyoSandboxDetected !== null) return _saDyoSandboxDetected;
+
+  // Check 1: Does our URL look like a known sandbox/proxy path?
+  // This is the most reliable check — no false positives on real pages.
+  try {
+    const href = window.location.href;
+    if (SA_DYO_SANDBOX_PATTERNS.some(re => re.test(href))) {
+      _saDyoSandboxDetected = true;
+      return true;
+    }
+  } catch (e) {
+    // Can't read window.location — likely sandboxed
+    _saDyoSandboxDetected = true;
+    return true;
+  }
+
+  // Check 2: Are we in a same-origin iframe with a different path than top?
+  // We only flag this if top has a genuinely different pathname (rules out
+  // legitimate same-page iframes where path matches).
+  try {
+    if (window !== window.top) {
+      // Same-origin — we can compare paths
+      if (window.top.location.pathname !== window.location.pathname) {
+        _saDyoSandboxDetected = true;
+        return true;
+      }
+    }
+  } catch (e) {
+    // Cross-origin iframe — we can't get the real URL from top anyway,
+    // so don't flag as sandboxed (our fallback strategies won't help).
+  }
+
+  // Check 3: Does document.baseURI differ from window.location?
+  // Some sandbox tools set document.baseURI to the real page but run the
+  // script from a different location.
+  try {
+    if (document.baseURI) {
+      const baseUrl = new URL(document.baseURI);
+      if (baseUrl.origin === window.location.origin &&
+          baseUrl.pathname !== window.location.pathname) {
+        _saDyoSandboxDetected = true;
+        return true;
+      }
+    }
+  } catch (e) {
+    // Ignore — not all environments support baseURI comparison
+  }
+
+  _saDyoSandboxDetected = false;
+  return false;
+};
+
+/**
+ * Builds a location-like object from a URL string.
+ * Used as a fallback when we can't access a real Location object.
+ * @param {string} urlStr - A full URL string
+ * @return {Object} An object with the same shape as window.location
+ */
+const buildLocationFromUrl = urlStr => {
+  const parsed = new URL(urlStr);
+  return {
+    href: parsed.href,
+    origin: parsed.origin,
+    pathname: parsed.pathname,
+    search: parsed.search,
+    hash: parsed.hash,
+    hostname: parsed.hostname,
+    host: parsed.host,
+    protocol: parsed.protocol,
+  };
+};
+
+/**
+ * Gets the real page location, escaping any sandboxed context.
+ *
+ * For strategies 1 & 2 (window.top / window.parent) we return the live
+ * Location object — it stays current across SPA navigations.
+ * For strategies 3 & 4 (baseURI / referrer) we return a static snapshot
+ * which may go stale on SPA navigation (but these are last-resort fallbacks).
+ *
+ * @return {Location|Object} The real page Location object (or location-like object)
+ */
+const getRealLocation = () => {
+  if (!isSandboxedContext()) {
+    return window.location;
+  }
+
+  // Strategy 1: top window's location (same-origin — stays live across SPA nav)
+  try {
+    if (window.top && window.top.location && window.top.location.href) {
+      return window.top.location;
+    }
+  } catch (e) {
+    // Cross-origin — try next strategy
+  }
+
+  // Strategy 2: parent window's location (same-origin — stays live)
+  try {
+    if (window.parent && window.parent !== window &&
+        window.parent.location && window.parent.location.href) {
+      return window.parent.location;
+    }
+  } catch (e) {
+    // Cross-origin — try next strategy
+  }
+
+  // Strategy 3: document.baseURI (static snapshot — may go stale on SPA nav)
+  try {
+    if (document.baseURI &&
+        document.baseURI !== window.location.href &&
+        !document.baseURI.startsWith('about:')) {
+      return buildLocationFromUrl(document.baseURI);
+    }
+  } catch (e) {
+    // Invalid URL — try next strategy
+  }
+
+  // Strategy 4: document.referrer (static — the page that loaded the sandbox)
+  try {
+    if (document.referrer && document.referrer !== window.location.href) {
+      return buildLocationFromUrl(document.referrer);
+    }
+  } catch (e) {
+    // Invalid URL — fallback
+  }
+
+  // All strategies exhausted — use window.location as-is
+  return window.location;
+};
+
+/**
+ * Returns the correct window to attach navigation listeners to.
+ * In a sandboxed iframe, SPA navigation (pushState/popstate) happens on
+ * the TOP window — the sandbox's own window never sees those events.
+ * @return {Window} The window object to use for navigation event binding
+ */
+const getNavigationWindow = () => {
+  if (!isSandboxedContext()) return window;
+  try {
+    if (window.top && window.top !== window) return window.top;
+  } catch (e) {
+    // Cross-origin — fall back to our own window
+  }
+  try {
+    if (window.parent && window.parent !== window) return window.parent;
+  } catch (e) {
+    // Cross-origin
+  }
+  return window;
+};
+
+/**
+ * Gets the real page URL (origin + pathname), escaping sandboxed contexts.
+ * @return {string} The actual page URL without query params or hash
+ */
+const getRealPageUrl = () => {
+  const loc = getRealLocation();
+  return loc.origin + loc.pathname;
+};
+
+/**
+ * Gets the real full URL including query params.
+ * @return {string} The actual full page URL
+ */
+const getRealFullUrl = () => {
+  const loc = getRealLocation();
+  return loc.href;
+};
+
+const saDyoRealLocation = getRealLocation();
+const saDyoUrlParams = new URLSearchParams(saDyoRealLocation.search);
+const saDyoDiagnosticsExist = saDyoUrlParams.has('diagnostics');
+
+// Delay (in ms) before resetting isApplyingPageData flag
+// Allows queued MutationObserver callbacks to be skipped
+const FLAG_RESET_DELAY_MS = 50;
+
+// Global flag to prevent re-entrant DOM modifications
+let isApplyingPageData = false;
+
+// ========== OBSERVER CLEANUP (Must be defined before applyPageData) ==========
+/**
+ * Cleans up the main DOM observer.
+ * Called before DOM modifications and on page navigation.
+ */
+const cleanupTargetedObservers = () => {
+  // Disconnect the main observer if it exists to prevent callbacks during our changes
+  if (typeof domObserver !== 'undefined' && domObserver) {
+    domObserver.disconnect();
+    consolePrint('DOM observer disconnected for cleanup');
+  }
+};
+
+/**
+ * Reconnects the DOM observer after modifications are complete.
+ * Called after applyPageData finishes.
+ */
+const reconnectDOMObserver = () => {
+  if (typeof domObserver === 'undefined' || !domObserver) {
+    return;
+  }
+
+  // Observe body for content changes
+  if (document.body) {
+    domObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ['href', 'alt', 'src'],
+    });
+  }
+
+  // Observe head for meta tag changes
+  if (document.head) {
+    domObserver.observe(document.head, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ['content', 'href'],
+    });
+  }
+
+  consolePrint('DOM observer reconnected');
+};
+
+// ========== FUNCTION DEFINITIONS (Always available) ==========
+// These functions are defined outside the initialization guard so they're
+// always available for testing and external use
+
+const saDyoApiRoute = () => {
+  return document.getElementById('sa-dynamic-optimization')?.getAttribute('src') === 'https://dashboard.staging.searchatlas.com/scripts/dynamic_optimization.js' ||
+    document.getElementById('sa-dynamic-optimization-loader')?.getAttribute('src') === 'https://dashboard.staging.searchatlas.com/scripts/dynamic_optimization.js' ?
+    SA_BASE_API_ROUTE_STAGING : SA_BASE_API_ROUTE_PROD;
+};
+
+const consolePrint = strData => {
+  if (saDyoDiagnosticsExist) {
+    console.debug(strData);
+  }
+};
+
+// eslint-disable-next-line valid-jsdoc
+/**
+ * Detects if the current page is a Wix website.
+ * Wix sites require longer wait times due to their complex hydration process.
+ */
+const isWixSite = () => {
+  return !!(window.wixBiSession ||
+            document.querySelector('[data-wix-root]') ||
+            document.querySelector('meta[name="generator"][content*="Wix"]') ||
+            window.wixPerformanceMeasurements ||
+            document.querySelector('link[href*="parastorage.com"]'));
+};
+
+// eslint-disable-next-line valid-jsdoc
+/**
+ * Waits for the page to be fully loaded and hydration to complete.
+ * Wix sites get longer wait times due to complex hydration.
+ * Other sites get faster execution.
+ *
+ * Strategy:
+ * 1. Wait for window.load event (all resources loaded)
+ * 2. For Wix: Wait minimum time after load (for hydration to start)
+ * 3. Wait for DOM to stabilize
+ * 4. Add extra buffer for deferred tasks
+ */
+const waitForPageReady = callback => {
+  const isWix = isWixSite();
+
+  // Wix sites need longer waits due to complex hydration
+  const MIN_WAIT_AFTER_LOAD_MS = isWix ? 2000 : 0; // Wix: 2000ms, Others: none
+  const STABILITY_THRESHOLD_MS = isWix ? 1000 : 0; // Wix: 1000ms, Others: none
+  const POST_STABILITY_DELAY_MS = isWix ? 500 : 0; // Wix: 500ms, Others: none
+  const MAX_WAIT_MS = isWix ? 12000 : 0; // Wix: 12s, Others: 8s
+
+  consolePrint(`Site detection: ${isWix ? 'Wix' : 'Non-Wix'} (min wait: ${MIN_WAIT_AFTER_LOAD_MS}ms, stability: ${STABILITY_THRESHOLD_MS}ms, buffer: ${POST_STABILITY_DELAY_MS}ms)`);
+
+  const startTime = Date.now();
+  let stabilityTimer = null;
+  let mutationObserver = null;
+
+  const executeCallback = reason => {
+    consolePrint(`Page ready: ${reason}`);
+    // Clean up observer
+    if (mutationObserver) {
+      mutationObserver.disconnect();
+      mutationObserver = null;
+    }
+    if (stabilityTimer) {
+      clearTimeout(stabilityTimer);
+      stabilityTimer = null;
+    }
+
+    // Add post-stability delay for Wix sites
+    if (POST_STABILITY_DELAY_MS > 0) {
+      consolePrint(`Adding ${POST_STABILITY_DELAY_MS}ms post-stability buffer (Wix)`);
+      setTimeout(() => {
+        saDyoHydrationReady = true;
+        const totalElapsed = Date.now() - startTime;
+        consolePrint(`Executing callback after total ${totalElapsed}ms wait`);
+        callback();
+      }, POST_STABILITY_DELAY_MS);
+    } else {
+      // Non-Wix: execute immediately
+      saDyoHydrationReady = true;
+      const totalElapsed = Date.now() - startTime;
+      consolePrint(`Executing callback after total ${totalElapsed}ms wait`);
+      callback();
+    }
+  };
+
+  const startStabilityCheck = () => {
+    consolePrint('Starting DOM stability check');
+
+    // Set up mutation observer to detect DOM changes
+    mutationObserver = new MutationObserver(() => {
+      // DOM changed - reset stability timer
+      if (stabilityTimer) {
+        clearTimeout(stabilityTimer);
+      }
+
+      const elapsed = Date.now() - startTime;
+      if (elapsed >= MAX_WAIT_MS) {
+        executeCallback(`Max wait time reached (${MAX_WAIT_MS}ms)`);
+        return;
+      }
+
+      // Start new stability timer
+      stabilityTimer = setTimeout(() => {
+        const totalElapsed = Date.now() - startTime;
+        executeCallback(`DOM stable for ${STABILITY_THRESHOLD_MS}ms (total: ${totalElapsed}ms)`);
+      }, STABILITY_THRESHOLD_MS);
+    });
+
+    // Observe all DOM changes (body and head)
+    if (document.body) {
+      mutationObserver.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        characterData: true,
+      });
+    }
+    if (document.head) {
+      mutationObserver.observe(document.head, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        characterData: true,
+      });
+    }
+
+    // Start initial stability timer
+    stabilityTimer = setTimeout(() => {
+      const elapsed = Date.now() - startTime;
+      executeCallback(`DOM initially stable for ${STABILITY_THRESHOLD_MS}ms (total: ${elapsed}ms)`);
+    }, STABILITY_THRESHOLD_MS);
+
+    // Safety timeout
+    setTimeout(() => {
+      if (mutationObserver) {
+        executeCallback(`Safety timeout after ${MAX_WAIT_MS}ms`);
+      }
+    }, MAX_WAIT_MS - (Date.now() - startTime));
+  };
+
+  // Wait minimum time after load before checking stability (Wix only)
+  const startWithMinWait = () => {
+    if (MIN_WAIT_AFTER_LOAD_MS > 0) {
+      consolePrint(`Waiting minimum ${MIN_WAIT_AFTER_LOAD_MS}ms after load for Wix hydration`);
+      setTimeout(() => {
+        consolePrint(`Minimum wait complete, now checking DOM stability`);
+        startStabilityCheck();
+      }, MIN_WAIT_AFTER_LOAD_MS);
+    } else {
+      // Non-Wix: start stability check immediately
+      startStabilityCheck();
+    }
+  };
+
+  // Wait for load event first, then apply minimum wait
+  if (document.readyState === 'complete') {
+    consolePrint('Document already complete, applying minimum wait');
+    startWithMinWait();
+  } else {
+    consolePrint('Waiting for window load event');
+    window.addEventListener('load', () => {
+      consolePrint('Window load event fired, applying minimum wait');
+      startWithMinWait();
+    }, {once: true});
+  }
+};
+
+const fetchData = async (pageUrl, uuid) => {
+  let saDyoApiUrl = `${saDyoApiRoute()}/otto-url-details/?url=${encodeURIComponent(pageUrl)}`;
+  if (uuid) saDyoApiUrl += `&uuid=${uuid}`;
+
+  try {
+    const saDyoResponse = await fetch(saDyoApiUrl);
+    if (!saDyoResponse.ok) {
+      consolePrint('API call failed.');
+      return;
+    }
+    const saDyoPageData = await saDyoResponse.json();
+    window.otto_js_pageData = saDyoPageData;
+    consolePrint(`API response: ${saDyoPageData}`);
+
+    // Wait for page hydration before applying changes
+    if (getRealPageUrl() === pageUrl) {
+      waitForPageReady(() => applyPageData(saDyoPageData));
+    }
+    return saDyoPageData;
+  } catch (error) {
+    consolePrint(`Fetch error: ${error}`);
+  }
+};
+
+const postPageCrawlLogs = async (pageUrl, uuid, context) => {
+  try {
+    const saDyoUseragent = navigator.userAgent;
+    if (saDyoUseragent.includes('bot')) {
+      const saDyoApiUrl = `${saDyoApiRoute()}/otto-page-crawl-logs/`;
+      const saDyoBodyData = {
+        otto_uuid: uuid,
+        url: pageUrl,
+        user_agent: saDyoUseragent,
+        context: context,
+      };
+
+      try {
+        const saDyoResources = performance.getEntriesByType('resource');
+
+        // 1. Average Page Response Time
+        const saDyoTotalResponseTime = saDyoResources.reduce((sum, resource) => sum + (resource.responseEnd - resource.startTime), 0);
+        const saDyoAverageResponseTime = (saDyoResources.length > 0) ? (saDyoTotalResponseTime / saDyoResources.length).toFixed(2) : null;
+
+        // 2. Total Download Size
+        const saDyoTotalDownloadSize = saDyoResources.reduce((sum, resource) => sum + (resource.transferSize || 0), 0);
+        const saDyoTotalDownloadSizeKB = (saDyoTotalDownloadSize / 1024).toFixed(2);
+
+        if (saDyoAverageResponseTime) {
+          saDyoBodyData.average_response_time = saDyoAverageResponseTime;
+        }
+
+        if (saDyoTotalDownloadSizeKB) {
+          saDyoBodyData.total_download_size_kb = saDyoTotalDownloadSizeKB;
+        }
+      } catch (error) {
+        consolePrint(`Resources error: ${error}`);
+      }
+
+      const saDyoResponse = await fetch(saDyoApiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(saDyoBodyData),
+      });
+
+      if (!saDyoResponse.ok) {
+        consolePrint('API call failed.');
+        return;
+      }
+      const pageData = await saDyoResponse.json();
+      consolePrint(`API response: ${pageData}`);
+    }
+  } catch (error) {
+    consolePrint(`Fetch error: ${error}`);
+  }
+};
+
+const replaceMetaData = metaData => {
+  // Add null/undefined check to prevent destructuring errors
+  if (!metaData || typeof metaData !== 'object') {
+    consolePrint('Invalid metaData provided to replaceMetaData');
+    return;
+  }
+
+  let saDyoHeaderElementExist = false;
+  const {type, name, property, recommended_value: recommendedValue} = metaData;
+  const saDyoRecommendedValue = recommendedValue;
+
+  // Skip unsupported types (e.g., link/canonical is handled elsewhere)
+  if (type && type !== 'title' && type !== 'meta') {
+    consolePrint(`Skipping unsupported header replacement type: ${type}`);
+    return;
+  }
+
+  if (type === 'title') {
+    const saDyoTitles = document.querySelectorAll('title');
+    if (saDyoTitles?.length) {
+      saDyoTitles?.forEach(item => {
+        if (!window?.next) item?.remove();
+      });
+    }
+    saDyoHeaderElementExist = false;
+  } else {
+    const saDyoMetaSelector = `meta[name="${(name || property)?.trim()}"], meta[property="${(name || property)?.trim()}"]`;
+    saDyoHeaderElementExist = document.querySelector(saDyoMetaSelector) || false;
+  }
+
+  if (saDyoHeaderElementExist) {
+    consolePrint(`Header Meta - ${saDyoHeaderElementExist}`);
+    if (type === 'title') {
+      saDyoHeaderTitleTagCount++;
+      consolePrint(`Replacing existing title content - ${saDyoRecommendedValue}`);
+      saDyoHeaderElementExist.innerHTML = saDyoRecommendedValue;
+    } else {
+      consolePrint(`Replacing existing Meta content - ${saDyoRecommendedValue}`);
+      saDyoHeaderMetaTagCount++;
+      saDyoHeaderElementExist.setAttribute('content', saDyoRecommendedValue);
+    }
+  } else {
+    if (type === 'title') {
+      consolePrint(`Header Title Not Found - ${type}`);
+      saDyoHeaderTitleTagCount++;
+      if (window?.next) {
+        const saDyoTitle = document.querySelector('title');
+        saDyoTitle.innerHTML = saDyoRecommendedValue;
+      } else {
+        const saDyoTitleTag = `<title>${saDyoRecommendedValue}</title>`;
+        consolePrint(`Inserting Title tag element: ${saDyoTitleTag}`);
+        document.head.insertAdjacentHTML('afterbegin', saDyoTitleTag);
+      }
+    } else {
+      consolePrint(`Header Meta Not Found - ${type}`);
+      const saDyoMetaAttribute = property ? 'property' : 'name';
+      const saDyoMetaTag = `<meta ${saDyoMetaAttribute}="${property ? property : name}" content="${saDyoRecommendedValue}">`;
+      saDyoHeaderMetaTagCount++;
+      consolePrint(`Inserting tag element: ${saDyoMetaTag}`);
+      document.head.insertAdjacentHTML('afterbegin', saDyoMetaTag);
+    }
+  }
+};
+
+const getBaseImageUrl = url => (url.match(/^(.*?\.(jpg|jpeg|png|gif|webp|svg))/i) || [url])[0];
+
+const addAltTextToImages = images => {
+  const saDyoAllImgsElements = document.querySelectorAll(`img`);
+  saDyoAllImgsElements?.forEach(imgElement => {
+    images?.forEach(([imageUrl, altText]) => {
+      Array.from(imgElement.attributes)?.forEach(attribute => {
+        if (attribute && (attribute.value === imageUrl ||
+            attribute.value?.includes(getBaseImageUrl(imageUrl)))) {
+          saDyoImagesAltsUpdationCount++;
+          consolePrint(`Adding/updating alt text for ${imgElement} with: ${altText}`);
+          imgElement.alt = altText;
+        }
+      });
+    });
+  });
+  consolePrint(`Total alt texts updated: ${saDyoImagesAltsUpdationCount}`);
+};
+
+let intervalID;
+
+// Enhanced function to remove all dynamic optimization content for SPAs
+const removeDynamicOptimizationContent = () => {
+  try {
+    // Remove elements with data attributes
+    const saDyoElementsToRemove = document.querySelectorAll('[data-otto-pixel="dynamic-seo"],[data-otto-pixel="searchatlas"]');
+    saDyoElementsToRemove.forEach(element => {
+      element.remove();
+    });
+
+    // Remove diagnostic comments for SPAs
+    if (typeof saDyoDiagnosticsExist !== 'undefined' && saDyoDiagnosticsExist) {
+      const walker = document.createTreeWalker(
+        document.body,
+        NodeFilter.SHOW_COMMENT,
+        {
+          acceptNode: function(node) {
+            return node.nodeValue &&
+              (node.nodeValue.includes('Dynamic Optimization') ||
+               node.nodeValue.includes('SearchAtlas')) ?
+              NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+          },
+        },
+      );
+
+      const commentsToRemove = [];
+      let node;
+      while (node = walker.nextNode()) {
+        commentsToRemove.push(node);
+      }
+      commentsToRemove.forEach(comment => {
+        comment.remove();
+      });
+    }
+
+    // Reset counters for fresh start - only if variables exist
+    if (typeof saDyoHeaderInsertionCount !== 'undefined') saDyoHeaderInsertionCount = 0;
+    if (typeof saDyoHeaderTitleTagCount !== 'undefined') saDyoHeaderTitleTagCount = 0;
+    if (typeof saDyoHeaderMetaTagCount !== 'undefined') saDyoHeaderMetaTagCount = 0;
+    if (typeof saDyoBodyHtmlTopInsertionCount !== 'undefined') saDyoBodyHtmlTopInsertionCount = 0;
+    if (typeof saDyoBodyHtmlBottomInsertionCount !== 'undefined') saDyoBodyHtmlBottomInsertionCount = 0;
+    if (typeof saDyoLinksUpdationCount !== 'undefined') saDyoLinksUpdationCount = 0;
+    if (typeof saDyoImagesAltsUpdationCount !== 'undefined') saDyoImagesAltsUpdationCount = 0;
+    if (typeof saDyoFooterHtmlInsertionCount !== 'undefined') saDyoFooterHtmlInsertionCount = 0;
+    if (typeof saDyoHeadersUpdationCount !== 'undefined' && saDyoHeadersUpdationCount) {
+      Object.keys(saDyoHeadersUpdationCount).forEach(key => {
+        saDyoHeadersUpdationCount[key] = 0;
+      });
+    }
+  } catch (error) {
+    if (typeof consolePrint === 'function') {
+      consolePrint(`Error removing dynamic optimization content: ${error}`);
+    } else {
+      console.warn(`Error removing dynamic optimization content: ${error}`);
+    }
+  }
+};
+
+// Detect SPA framework for better compatibility
+const detectSPAFramework = () => {
+  if (typeof window === 'undefined') return 'unknown';
+
+  // Next.js detection
+  if (window?.next || window?.__NEXT_DATA__) return 'nextjs';
+
+  // Angular detection
+  if (window?.ng || document.querySelector('[ng-app], [data-ng-app], [ng-controller]') || window?.angular) return 'angular';
+
+  // Vue detection
+  if (window?.Vue || document.querySelector('[v-app], [data-v-app]') || window?.__VUE__) return 'vue';
+
+  // React detection (vanilla React apps)
+  if (window?.React || document.querySelector('#root, #app, [data-reactroot]')) return 'react';
+
+  // Nuxt.js detection
+  if (window?.$nuxt || window?.__NUXT__) return 'nuxt';
+
+  return 'unknown';
+};
+
+const applyPageData = saDyoPageData => {
+// Prevent re-entrant calls
+  if (isApplyingPageData) {
+    consolePrint('applyPageData already in progress, skipping');
+    return;
+  }
+
+  // Handle null/undefined data gracefully
+  if (!saDyoPageData || typeof saDyoPageData !== 'object') {
+    if (typeof consolePrint === 'function') {
+      consolePrint('No valid page data provided to applyPageData');
+    }
+    return;
+  }
+
+  // Set flag at the start to prevent any observer callbacks during application
+  isApplyingPageData = true;
+
+  try {
+  // Clean up any existing observers FIRST before modifying DOM
+    cleanupTargetedObservers();
+
+    // Remove any existing dynamic optimization content to prevent duplicates
+    removeDynamicOptimizationContent();
+
+    const framework = detectSPAFramework();
+    if (typeof consolePrint === 'function') {
+      consolePrint(`Detected SPA framework: ${framework}`);
+    }
+
+    // Handle header HTML insertion
+    if (typeof consolePrint === 'function') {
+      consolePrint(`Header HTML insertion started: ${saDyoPageData.header_html_insertion}`);
+    }
+    const saDyoHtmlToInject = saDyoPageData.header_html_insertion ?
+      `${(typeof saDyoDiagnosticsExist !== 'undefined' && saDyoDiagnosticsExist) ?
+        '<!-- Dynamic Optimization Header Integration Start -->' : ''}${saDyoPageData.header_html_insertion}${
+        (typeof saDyoDiagnosticsExist !== 'undefined' && saDyoDiagnosticsExist) ?
+          '<!-- Dynamic Optimization Header Integration Ended -->' : ''}` : '';
+    if (saDyoHtmlToInject) {
+      document.head.insertAdjacentHTML('afterbegin', saDyoHtmlToInject);
+      if (typeof saDyoHeaderInsertionCount !== 'undefined') {
+        saDyoHeaderInsertionCount++;
+      }
+    }
+    if (typeof consolePrint === 'function') {
+      consolePrint(`Header HTML insertion ended: ${saDyoHtmlToInject}`);
+    }
+
+    try {
+      if (typeof consolePrint === 'function') {
+        consolePrint(`Header replacements started: ${saDyoPageData.header_replacements}`);
+      }
+      if (Array.isArray(saDyoPageData.header_replacements)) {
+        saDyoPageData.header_replacements?.forEach(data => {
+          replaceMetaData(data);
+        });
+      }
+      if (typeof consolePrint === 'function') {
+        consolePrint(`Header replacements ended: ${saDyoPageData.header_replacements}`);
+      }
+    } catch (error) {
+      if (typeof consolePrint === 'function') {
+        consolePrint(`Header replacements Error: ${error}`);
+      }
+    }
+
+    const saDyoBodyElement = document.querySelector('body');
+    if (!saDyoBodyElement) {
+      if (typeof consolePrint === 'function') {
+        consolePrint('Warning: Body element not found');
+      }
+      return;
+    }
+
+    // Handle body top HTML insertion
+    if (typeof consolePrint === 'function') {
+      consolePrint(`Body top HTML insertion started: ${saDyoPageData.body_top_html_insertion}`);
+    }
+    const saDyoTopHtmlToInject = saDyoPageData.body_top_html_insertion ?
+      `${(typeof saDyoDiagnosticsExist !== 'undefined' && saDyoDiagnosticsExist) ?
+        '<!-- Dynamic Optimization Body Top Integration Start -->' : ''}${saDyoPageData.body_top_html_insertion}${
+        (typeof saDyoDiagnosticsExist !== 'undefined' && saDyoDiagnosticsExist) ?
+          '<!-- Dynamic Optimization Body Top Integration Ended -->' : ''} ` : '';
+    if (saDyoTopHtmlToInject) {
+      if (typeof saDyoBodyHtmlTopInsertionCount !== 'undefined') {
+        saDyoBodyHtmlTopInsertionCount++;
+      }
+      saDyoBodyElement.insertAdjacentHTML('afterbegin', saDyoTopHtmlToInject);
+    }
+    if (typeof consolePrint === 'function') {
+      consolePrint(`Body top HTML insertion ended: ${saDyoTopHtmlToInject}`);
+    }
+
+    // Handle body bottom HTML insertion
+    if (typeof consolePrint === 'function') {
+      consolePrint(`Body bottom HTML insertion started: ${saDyoPageData.body_bottom_html_insertion}`);
+    }
+    const saDyoBottomHtmlToInject = saDyoPageData.body_bottom_html_insertion ?
+      `${(typeof saDyoDiagnosticsExist !== 'undefined' && saDyoDiagnosticsExist) ?
+        '<!-- Dynamic Optimization Body Bottom Integration Start -->' : ''}${saDyoPageData.body_bottom_html_insertion}${
+        (typeof saDyoDiagnosticsExist !== 'undefined' && saDyoDiagnosticsExist) ?
+          '<!-- Dynamic Optimization Body Bottom Integration Ended -->' : ''} ` : '';
+    if (saDyoBottomHtmlToInject) {
+      if (typeof saDyoBodyHtmlBottomInsertionCount !== 'undefined') {
+        saDyoBodyHtmlBottomInsertionCount++;
+      }
+      saDyoBodyElement.insertAdjacentHTML('beforeend', saDyoBottomHtmlToInject);
+    }
+    if (typeof consolePrint === 'function') {
+      consolePrint(`Body bottom HTML insertion ended: ${saDyoBottomHtmlToInject}`);
+    }
+
+    // Handle body substitutions
+    if (typeof consolePrint === 'function') {
+      consolePrint('Body substitutions started');
+    }
+    if (saDyoPageData.body_substitutions && typeof saDyoPageData.body_substitutions === 'object') {
+      for (const [saDyoBodySubstitutionsKey, saDyoData] of Object.entries(saDyoPageData.body_substitutions)) {
+        if (saDyoBodySubstitutionsKey !== 'images') {
+          if (typeof consolePrint === 'function') {
+            consolePrint(`${saDyoBodySubstitutionsKey} - updating element value: ${saDyoData}`);
+          }
+          if (saDyoBodySubstitutionsKey === 'links') {
+            const listData = Object.entries(saDyoData);
+            listData.forEach(([oldUrl, newUrl]) => {
+              try {
+                const pathname = new URL(oldUrl).pathname;
+                // Normalize URLs by removing trailing slashes for comparison
+                const normalizeUrl = url => url?.replace(/\/$/, '');
+
+                document.querySelectorAll('a[href]')?.forEach(element => {
+                  const elementHref = element.href;
+                  const elementHrefAttr = element.getAttribute('href');
+
+                  // Check if matches: full URL (with/without trailing slash) or pathname
+                  if (normalizeUrl(elementHref) === normalizeUrl(oldUrl) || elementHrefAttr === pathname) {
+                    element.href = newUrl;
+                    saDyoLinksUpdationCount++;
+                  }
+                });
+              } catch (e) {
+                consolePrint(`Replacing Old Url: ${oldUrl} with New Url: ${newUrl} Failed`);
+              }
+            });
+          } else if (saDyoBodySubstitutionsKey === 'headings') {
+            saDyoData?.forEach(item => {
+              document.querySelectorAll(item.type)?.forEach(element => {
+              // Keep deployed heading matching aligned with PreviewModal so crawler/live DOM
+              // punctuation spacing and invisible-character drift compare consistently.
+                const normalizeText = text => text
+                  .replace(/&nbsp;/g, ' ')
+                  .replace(/&amp;/g, '&')
+                  .replace(/&quot;/g, '"')
+                  .replace(/&#0?39;|&#x27;/g, "'")
+                  .replace(/[­​-‏‪-‮⁠﻿]/g, '')
+                  .replace(/[‘’‚‛′]/g, "'")
+                  .replace(/[“”„‟″]/g, '"')
+                  .replace(/[‐‑‒–—−]/g, '-')
+                  .replace(/ /g, ' ')
+                  .replace(/…/g, '...')
+                  .replace(/[：，．；]/g, char => ({'：': ':', '，': ',', '．': '.', '；': ';'}[char] || char))
+                  .replace(/\s+/g, ' ')
+                  .trim()
+                  .replace(/\s*([,:;.!?])\s*(?=\S)/g, (match, punctuation, offset, whole) => {
+                    const before = whole[offset - 1] || '';
+                    const after = whole[offset + match.length] || '';
+                    if ((/\d/.test(before) && /\d/.test(after)) || after === punctuation) return match;
+                    return `${punctuation} `;
+                  })
+                  .replace(/\s*([,:;.!?])\s*$/, '$1');
+
+                const elementText = normalizeText(element.textContent);
+                const targetText = normalizeText(item.current_value);
+
+                if (elementText === targetText) {
+                  consolePrint(`${item.type} - heading - ${element.textContent} - Recommended heading - ${item.recommended_value}`);
+                  saDyoHeadersUpdationCount[item.type]++;
+
+                  // More precise text replacement that preserves HTML structure
+                  const replaceTextInNode = (node, oldText, newText) => {
+                    if (node.nodeType === Node.TEXT_NODE) {
+                      const nodeText = normalizeText(node.textContent);
+                      if (nodeText.includes(normalizeText(oldText))) {
+                      // Handle partial matches within text nodes
+                        node.textContent = node.textContent.replace(oldText, newText);
+                      }
+                    } else {
+                    // Recursively process child nodes
+                      Array.from(node.childNodes).forEach(child => {
+                        replaceTextInNode(child, oldText, newText);
+                      });
+                    }
+                  };
+
+                  // More robust text replacement for complex cases
+                  const replaceComplexText = (element, oldText, newText) => {
+                    const walker = document.createTreeWalker(
+                      element,
+                      NodeFilter.SHOW_TEXT,
+                      null,
+                      false,
+                    );
+
+                    const textNodes = [];
+                    let node;
+                    while (node = walker.nextNode()) {
+                      textNodes.push(node);
+                    }
+
+                    // Combine all text content
+                    const fullText = textNodes.map(n => n.textContent).join('');
+                    const normalizedFullText = normalizeText(fullText);
+                    const normalizedOldText = normalizeText(oldText);
+
+                    if (normalizedFullText === normalizedOldText) {
+                    // Clear all text nodes first
+                      textNodes.forEach(textNode => {
+                        textNode.textContent = '';
+                      });
+
+                      // Put the new text in the first text node
+                      if (textNodes.length > 0) {
+                        textNodes[0].textContent = newText;
+                      }
+                    } else if (normalizedFullText.includes(normalizedOldText)) {
+                    // For partial matches, use the original logic
+                      const replacedText = fullText.replace(oldText, newText);
+
+                      // Distribute the new text back to text nodes
+                      let currentIndex = 0;
+                      textNodes.forEach(textNode => {
+                        const nodeLength = textNode.textContent.length;
+                        if (currentIndex < replacedText.length) {
+                          const newNodeText = replacedText.substr(currentIndex, nodeLength);
+                          textNode.textContent = newNodeText;
+                          currentIndex += nodeLength;
+                        } else {
+                          textNode.textContent = '';
+                        }
+                      });
+                    }
+                  };
+
+                  const targetElement = element;
+
+                  // If the element only contains text (no child elements), do simple replacement.
+                  // We are inside the normalized `elementText === targetText` branch, so drifted raw
+                  // text (punctuation spacing, smart quotes, invisible chars) must be fully replaced
+                  // with the recommendation — a raw string replace would silently miss it.
+                  if (targetElement.children.length === 0) {
+                    targetElement.textContent = item.recommended_value;
+                  } else {
+                  // Try complex replacement for elements with child nodes
+                    replaceComplexText(targetElement, item.current_value, item.recommended_value);
+
+                    // If complex replacement didn't work, try the recursive approach
+                    if (normalizeText(targetElement.textContent) === targetText) {
+                      replaceTextInNode(targetElement, item.current_value, item.recommended_value);
+                    }
+                  }
+                }
+              });
+            });
+          }
+        }
+      }
+    }
+    if (typeof consolePrint === 'function') {
+      consolePrint('Body substitutions ended');
+    }
+
+    if (Array.isArray(saDyoPageData.header_replacements) && saDyoPageData.header_replacements?.length > 0) {
+      const saDyoCanonicalLink = saDyoPageData.header_replacements.find(item=> item?.type == 'link' && item?.rel == 'canonical');
+      const element = document.querySelector(`link[rel="canonical"]`);
+      if (saDyoCanonicalLink && element) {
+        element.href = saDyoCanonicalLink?.recommended_value;
+      }
+    }
+
+    if (typeof consolePrint === 'function') {
+      consolePrint('Intersection of missing alt tags started');
+    }
+    saDyoPageData?.body_substitutions?.images && addAltTextToImages(Object.entries(saDyoPageData?.body_substitutions?.images));
+    if (typeof consolePrint === 'function') {
+      consolePrint('Intersection of missing alt tags ended');
+    }
+
+    if (typeof consolePrint === 'function') {
+      consolePrint(`Footer HTML insertion started: ${saDyoPageData.footer_html_insertion}`);
+    }
+    if (saDyoPageData.footer_html_insertion) {
+      let saDyoFooterElement = document.querySelector('footer');
+      if (!saDyoFooterElement) {
+        if (typeof consolePrint === 'function') {
+          consolePrint('Footer element not found');
+        }
+        saDyoFooterElement = document.createElement('footer');
+        document.body.appendChild(saDyoFooterElement);
+        if (typeof consolePrint === 'function') {
+          consolePrint('Footer element added to footer');
+        }
+      }
+
+      // Wrap footer content with data-otto-pixel for proper cleanup
+      const saDyoFooterHtmlToInject = saDyoPageData.footer_html_insertion ?
+        `<div data-otto-pixel="dynamic-seo">${(typeof saDyoDiagnosticsExist !== 'undefined' && saDyoDiagnosticsExist) ?
+          '<!-- Dynamic Optimization Footer Integration Start -->' : ''}${saDyoPageData.footer_html_insertion}${
+          (typeof saDyoDiagnosticsExist !== 'undefined' && saDyoDiagnosticsExist) ?
+            '<!-- Dynamic Optimization Footer Integration Ended -->' : ''}</div>` : '';
+      if (typeof saDyoFooterHtmlInsertionCount !== 'undefined') {
+        saDyoFooterHtmlInsertionCount++;
+      }
+      saDyoFooterElement.insertAdjacentHTML('beforeend', saDyoFooterHtmlToInject);
+      if (typeof consolePrint === 'function') {
+        consolePrint(`Footer HTML inserted: ${saDyoFooterHtmlToInject}`);
+      }
+    }
+    if (typeof consolePrint === 'function') {
+      consolePrint(`Footer HTML insertion ended: ${saDyoPageData.footer_html_insertion}`);
+    }
+
+    if (typeof consolePrint === 'function') {
+      consolePrint('*************************************************************');
+      consolePrint('******************** Diagnostics Summary ********************');
+      consolePrint(`Header Insertions: ${saDyoHeaderInsertionCount}`);
+      consolePrint(`Header Title Updated: ${saDyoHeaderTitleTagCount}`);
+      consolePrint(`Body Top HTML Insertions: ${saDyoBodyHtmlTopInsertionCount}`);
+      consolePrint(`Body Bottom HTML Insertions: ${saDyoBodyHtmlBottomInsertionCount}`);
+      consolePrint(`Footer HTML Insertions: ${saDyoFooterHtmlInsertionCount}`);
+
+      consolePrint(`Header Meta Tag Updated: ${saDyoHeaderMetaTagCount} out of ${Array.isArray(saDyoPageData.header_replacements) ? saDyoPageData.header_replacements?.filter(item => item.type != 'title')?.length : 0}`);
+      consolePrint(`Image Alt Replacements: ${saDyoImagesAltsUpdationCount} out of ${(saDyoPageData.body_substitutions && 'images' in saDyoPageData.body_substitutions) ? Object.keys(saDyoPageData.body_substitutions?.images)?.length : 0}`);
+      consolePrint(`Link Replacements: ${saDyoLinksUpdationCount} out of ${(saDyoPageData.body_substitutions && 'links' in saDyoPageData.body_substitutions) ? Object.keys(saDyoPageData.body_substitutions?.links)?.length : 0}`);
+      Object.entries(saDyoHeadersUpdationCount).forEach(value => {
+        consolePrint(`${value[0]} headings replaced - ${value[1]}`);
+      });
+      consolePrint('*************************************************************');
+      consolePrint('*************************************************************');
+    }
+  } finally {
+  // Use setTimeout to ensure the flag is reset AFTER any queued MutationObserver callbacks
+  // This prevents race conditions where observer callbacks fire between DOM changes and flag reset
+    setTimeout(() => {
+      isApplyingPageData = false;
+      saDyoInitialApplyDone = true;
+      reconnectDOMObserver();
+      consolePrint('applyPageData complete, flag reset');
+    }, FLAG_RESET_DELAY_MS);
+  }
+};
+
+// Interval function that respects the isApplyingPageData flag
+const intervalFunctionToRendermetaData = saDyoPageData => {
+  intervalID = setInterval(() => {
+  // Skip if currently applying page data to prevent conflicts
+    if (isApplyingPageData) {
+      consolePrint('Interval skipped - applyPageData in progress');
+      return;
+    }
+    if (!saDyoHydrationReady) {
+      consolePrint('Interval skipped - hydration not complete');
+      return;
+    }
+    if (saDyoInitialApplyDone) {
+      consolePrint('Interval skipped - initial apply completed');
+      return;
+    }
+
+    // Set the flag before making changes
+    isApplyingPageData = true;
+    try {
+      if (Array.isArray(saDyoPageData.header_replacements)) {
+        saDyoPageData.header_replacements?.forEach(data => {
+          replaceMetaData(data);
+        });
+      }
+    } finally {
+    // Reset with delay to allow any queued observer callbacks to be skipped
+      setTimeout(() => {
+        isApplyingPageData = false;
+      }, FLAG_RESET_DELAY_MS);
+    }
+  }, 3000);
+};
+
+// Track if load listener has been added to prevent duplicates
+let loadListenerAdded = false;
+
+const initializeScript = async () => {
+  consolePrint('Script initialization');
+  const sandboxed = isSandboxedContext();
+  if (sandboxed) {
+    consolePrint(`Sandboxed context detected. window.location: ${window.location.href}`);
+    consolePrint(`Real page URL resolved to: ${getRealPageUrl()}`);
+  }
+  const saDyoUuid = document.getElementById('sa-otto')?.getAttribute('data-uuid') || document.getElementById('searchatlas')?.getAttribute('data-uuid') || document.getElementById('sa-dynamic-optimization')?.getAttribute('data-uuid');
+  consolePrint(`UUID: ${saDyoUuid}`);
+  try {
+    // In sandboxed contexts, SPA navigation (pushState/popstate) happens on
+    // the top window — the sandbox never sees those events. We attach
+    // listeners to the correct window so route changes are detected.
+    const navWindow = getNavigationWindow();
+    if (sandboxed && navWindow !== window) {
+      consolePrint(`Attaching navigation listeners to top window`);
+    }
+
+    const saDyoPushState = navWindow.history.pushState;
+    navWindow.history.pushState = function() {
+      // eslint-disable-next-line prefer-rest-params
+      saDyoPushState.apply(navWindow.history, arguments);
+      navWindow.dispatchEvent(new Event('locationchange'));
+    };
+    navWindow.onpopstate = function() {
+      navWindow.dispatchEvent(new Event('locationchange'));
+    };
+    navWindow.addEventListener('locationchange', async () => {
+      cleanupTargetedObservers();
+      removeDynamicOptimizationContent();
+      clearInterval(intervalID);
+      const saDyoPageData = await fetchData(getRealPageUrl(), saDyoUuid);
+      if (saDyoPageData) {
+      // Post crawl logs for bots (no need to add duplicate load listener)
+        postPageCrawlLogs(getRealFullUrl(), saDyoUuid, null);
+
+        intervalFunctionToRendermetaData(saDyoPageData);
+        setTimeout(() => {
+          clearInterval(intervalID);
+        }, 30000);
+      }
+    });
+  } catch (error) {
+    consolePrint(`Routing issue: ${error}`);
+  }
+
+  // Only add load listener once
+  if (!loadListenerAdded) {
+    loadListenerAdded = true;
+    window.addEventListener('load', () => {
+      postPageCrawlLogs(getRealFullUrl(), saDyoUuid, null);
+    });
+  }
+
+  const saDyoPageData = await fetchData(getRealPageUrl(), saDyoUuid);
+  if (saDyoPageData) {
+    intervalFunctionToRendermetaData(saDyoPageData);
+    setTimeout(() => {
+      clearInterval(intervalID);
+    }, 30000);
+
+    window.otto_js_installed = true;
+    window.otto_js_uuid = saDyoUuid;
+  }
+  consolePrint('Script ended');
+};
+
+// ========== EXPOSE FUNCTIONS TO WINDOW (For testing and external use) ==========
+window.detectSPAFramework = detectSPAFramework;
+window.removeDynamicOptimizationContent = removeDynamicOptimizationContent;
+window.applyPageData = applyPageData;
+window.initializeScript = initializeScript;
+
+// ========== EXECUTION GUARD (Prevent double initialization) ==========
+// Only execute the initialization once, but functions remain available
+if (!window.__SA_DYO_INITIALIZED__) {
+  window.__SA_DYO_INITIALIZED__ = true;
+  consolePrint('[SA Dynamic Optimization] Initializing script...');
+  initializeScript();
+} else {
+  console.warn('[SA Dynamic Optimization] Script already initialized, skipping execution. Functions remain available.');
+}
+
+// Export cleanup and reconnect functions globally
+window.cleanupTargetedObservers = cleanupTargetedObservers;
+window.reconnectDOMObserver = reconnectDOMObserver;
+
+
+let mutationDebounceTimeout = null;
+const MUTATION_DEBOUNCE_DELAY = 2000; // ms
+
+/**
+ * Checks if the current DOM state matches our applied changes
+ * @param {Object} saDyoPageData - The page data with expected values
+ * @return {boolean} true if DOM matches our changes, false otherwise
+ */
+const doesDOMMatchOurChanges = saDyoPageData => {
+  if (!saDyoPageData || typeof saDyoPageData !== 'object') {
+    return true; // No data to check against - assume OK (fail-safe)
+  }
+
+  try {
+    // Check header replacements (meta tags and title)
+    if (Array.isArray(saDyoPageData.header_replacements)) {
+      for (const metaData of saDyoPageData.header_replacements) {
+        if (!metaData || typeof metaData !== 'object') continue;
+
+        const {type, name, property, recommended_value: recommendedValue} = metaData;
+
+        if (type === 'title') {
+          const titleElement = document.querySelector('title');
+          if (titleElement && titleElement.textContent !== recommendedValue) {
+            consolePrint(`Title mismatch: expected "${recommendedValue}", found "${titleElement.textContent}"`);
+            return false;
+          }
+        } else if (type !== 'link') {
+          const metaSelector = `meta[name="${(name || property)?.trim()}"], meta[property="${(name || property)?.trim()}"]`;
+          const metaElement = document.querySelector(metaSelector);
+          if (metaElement && metaElement.getAttribute('content') !== recommendedValue) {
+            consolePrint(`Meta mismatch: expected "${recommendedValue}", found "${metaElement.getAttribute('content')}"`);
+            return false;
+          }
+        }
+      }
+    }
+
+    // Check canonical link
+    if (Array.isArray(saDyoPageData.header_replacements)) {
+      const canonicalLink = saDyoPageData.header_replacements.find(item => item?.type === 'link' && item?.rel === 'canonical');
+      if (canonicalLink) {
+        const canonicalElement = document.querySelector('link[rel="canonical"]');
+        if (canonicalElement && canonicalElement.href !== canonicalLink.recommended_value) {
+          consolePrint(`Canonical mismatch: expected "${canonicalLink.recommended_value}", found "${canonicalElement.href}"`);
+          return false;
+        }
+      }
+    }
+
+    // Check headings
+    if (saDyoPageData.body_substitutions && saDyoPageData.body_substitutions.headings) {
+      const normalizeText = text => text
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&quot;/g, '"')
+        .replace(/&#0?39;|&#x27;/g, "'")
+        .replace(/[­​-‏‪-‮⁠﻿]/g, '')
+        .replace(/[‘’‚‛′]/g, "'")
+        .replace(/[“”„‟″]/g, '"')
+        .replace(/[‐‑‒–—−]/g, '-')
+        .replace(/ /g, ' ')
+        .replace(/…/g, '...')
+        .replace(/[：，．；]/g, char => ({'：': ':', '，': ',', '．': '.', '；': ';'}[char] || char))
+        .replace(/\s+/g, ' ')
+        .trim()
+        .replace(/\s*([,:;.!?])\s*(?=\S)/g, (match, punctuation, offset, whole) => {
+          const before = whole[offset - 1] || '';
+          const after = whole[offset + match.length] || '';
+          if ((/\d/.test(before) && /\d/.test(after)) || after === punctuation) return match;
+          return `${punctuation} `;
+        })
+        .replace(/\s*([,:;.!?])\s*$/, '$1');
+
+      for (const headingItem of saDyoPageData.body_substitutions.headings) {
+        const headingElements = document.querySelectorAll(headingItem.type);
+
+        for (const element of headingElements) {
+          const elementText = normalizeText(element.textContent);
+          const targetText = normalizeText(headingItem.current_value);
+
+          // If element has OLD value, it needs updating
+          if (elementText === targetText) {
+            consolePrint(`Heading needs update: ${headingItem.type} with text "${elementText}"`);
+            return false;
+          }
+        }
+      }
+    }
+
+    // Check links
+    if (saDyoPageData.body_substitutions && saDyoPageData.body_substitutions.links) {
+      const normalizeUrl = url => url?.replace(/\/$/, '');
+
+      for (const [oldUrl, newUrl] of Object.entries(saDyoPageData.body_substitutions.links)) {
+        try {
+          const pathname = new URL(oldUrl).pathname;
+          const links = document.querySelectorAll('a[href]');
+          let foundMismatch = false;
+
+          for (const link of links) {
+            const linkHref = link.href;
+            const linkHrefAttr = link.getAttribute('href');
+
+            // If this link matches the old URL, it should have been updated to newUrl
+            if (normalizeUrl(linkHref) === normalizeUrl(oldUrl) || linkHrefAttr === pathname) {
+              if (normalizeUrl(linkHref) !== normalizeUrl(newUrl) && linkHrefAttr !== newUrl) {
+                consolePrint(`Link mismatch: expected "${newUrl}", found "${linkHref}"`);
+                foundMismatch = true;
+                break;
+              }
+            }
+          }
+
+          if (foundMismatch) {
+            return false;
+          }
+        } catch (e) {
+          consolePrint(`Error checking link: ${oldUrl}`);
+        }
+      }
+    }
+
+    // Check image alt texts
+    if (saDyoPageData.body_substitutions && saDyoPageData.body_substitutions.images) {
+      const images = document.querySelectorAll('img');
+
+      for (const [imageUrl, expectedAltText] of Object.entries(saDyoPageData.body_substitutions.images)) {
+        let foundMismatch = false;
+
+        for (const img of images) {
+          // Check if this image matches the URL
+          let matchesUrl = false;
+          for (const attr of Array.from(img.attributes)) {
+            if (attr.value === imageUrl ||
+                attr.value?.includes(getBaseImageUrl(imageUrl))) {
+              matchesUrl = true;
+              break;
+            }
+          }
+
+          if (matchesUrl && img.alt !== expectedAltText) {
+            consolePrint(`Image alt mismatch: expected "${expectedAltText}", found "${img.alt}"`);
+            foundMismatch = true;
+            break;
+          }
+        }
+
+        if (foundMismatch) {
+          return false;
+        }
+      }
+    }
+
+    // Check if our inserted HTML elements are present (header, body top/bottom, footer)
+    // We check for elements with data-otto-pixel attribute or diagnostic comments
+    if (saDyoPageData.header_html_insertion) {
+      const hasHeaderInsertion = document.head.innerHTML.includes(saDyoPageData.header_html_insertion) ||
+        document.querySelector('[data-otto-pixel="dynamic-seo"]') ||
+        (saDyoDiagnosticsExist && document.head.innerHTML.includes('Dynamic Optimization Header Integration'));
+      if (!hasHeaderInsertion) {
+        consolePrint('Header HTML insertion not found');
+        return false;
+      }
+    }
+
+    if (saDyoPageData.body_top_html_insertion) {
+      const hasBodyTopInsertion = document.body.innerHTML.includes(saDyoPageData.body_top_html_insertion) ||
+        (saDyoDiagnosticsExist && document.body.innerHTML.includes('Dynamic Optimization Body Top Integration'));
+      if (!hasBodyTopInsertion) {
+        consolePrint('Body top HTML insertion not found');
+        return false;
+      }
+    }
+
+    if (saDyoPageData.body_bottom_html_insertion) {
+      const hasBodyBottomInsertion = document.body.innerHTML.includes(saDyoPageData.body_bottom_html_insertion) ||
+        (saDyoDiagnosticsExist && document.body.innerHTML.includes('Dynamic Optimization Body Bottom Integration'));
+      if (!hasBodyBottomInsertion) {
+        consolePrint('Body bottom HTML insertion not found');
+        return false;
+      }
+    }
+
+    if (saDyoPageData.footer_html_insertion) {
+      const footer = document.querySelector('footer');
+      const hasFooterInsertion = footer && (
+        footer.innerHTML.includes(saDyoPageData.footer_html_insertion) ||
+        footer.querySelector('[data-otto-pixel="dynamic-seo"]') ||
+        (saDyoDiagnosticsExist && footer.innerHTML.includes('Dynamic Optimization Footer Integration'))
+      );
+      if (!hasFooterInsertion) {
+        consolePrint('Footer HTML insertion not found');
+        return false;
+      }
+    }
+
+    // All checks passed - DOM matches our changes
+    consolePrint('DOM matches our applied changes - skipping re-application');
+    return true;
+  } catch (error) {
+    consolePrint(`Error checking DOM state: ${error}`);
+    return true; // On error, assume OK to prevent loops (fail-safe)
+  }
+};
+
+const handleDOMChanges = () => {
+  // Prevent infinite loops from our own DOM changes
+  if (isApplyingPageData) {
+    return;
+  }
+
+  // Clear any existing debounce timeout
+  if (mutationDebounceTimeout) {
+    clearTimeout(mutationDebounceTimeout);
+    mutationDebounceTimeout = null;
+  }
+
+  // Debounce - wait for SPA to finish rendering
+  mutationDebounceTimeout = setTimeout(() => {
+    // Double-check flag after debounce (SPA might have triggered applyPageData)
+    if (isApplyingPageData) {
+      consolePrint('Debounce callback skipped - applyPageData in progress');
+      return;
+    }
+
+    const pageData = window.otto_js_pageData;
+    if (!pageData) {
+      consolePrint('No page data available');
+      return;
+    }
+
+    // Only re-apply if our changes are actually missing
+    if (!doesDOMMatchOurChanges(pageData)) {
+      consolePrint('DOM changes detected - waiting for stability before re-applying');
+      waitForPageReady(() => {
+        consolePrint('Page stable - re-applying optimizations');
+        applyPageData(pageData);
+      });
+    }
+  }, MUTATION_DEBOUNCE_DELAY);
+};
+
+// Create MutationObserver with filtering
+const domObserver = new MutationObserver(mutations => {
+  // Early exit if applying changes (prevents any processing)
+  if (isApplyingPageData) {
+    return;
+  }
+
+  // Filter out mutations from our own elements
+  const relevantMutations = mutations.filter(mutation => {
+    const target = mutation.target;
+
+    // Skip if target is null/undefined
+    if (!target) return false;
+
+    // Skip mutations on elements we control
+    if (target.hasAttribute) {
+      if (target.hasAttribute('data-otto-pixel')) return false;
+    }
+
+    // Skip if inside an element we added
+    if (target.closest && target.closest('[data-otto-pixel]')) {
+      return false;
+    }
+
+    return true;
+  });
+
+  // Only handle DOM changes if there are relevant mutations
+  if (relevantMutations.length > 0) {
+    handleDOMChanges();
+  }
+});
+
+// Start observing after delay to let initial render complete
+setTimeout(() => {
+  // Observe body for content changes
+  if (document.body) {
+    domObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ['href', 'alt', 'src'],
+    });
+    consolePrint('MutationObserver started on body');
+  }
+
+  // Observe head for meta tag changes
+  if (document.head) {
+    domObserver.observe(document.head, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ['content', 'href'],
+    });
+    consolePrint('MutationObserver started on head');
+  }
+}, 200); // 200ms delay for initial render
+
+// Cleanup observer on page unload
+window.addEventListener('beforeunload', () => {
+  if (mutationDebounceTimeout) {
+    clearTimeout(mutationDebounceTimeout);
+    mutationDebounceTimeout = null;
+  }
+  domObserver.disconnect();
+  consolePrint('MutationObserver disconnected');
+});
