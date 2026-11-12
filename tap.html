@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-4Z6XYXGD9L"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-4Z6XYXGD9L');
+</script>
+
+<!--
+  ┌──────────────────────────────────────────────────────────────┐
+  │  FILL THESE IN BEFORE PUBLISHING (search for "REPLACE_")     │
+  │                                                              │
+  │  REPLACE_GOOGLE_FORM_EMBED_URL  → Google Form > Send > "<>"  │
+  │      embed tab, copy ONLY the src URL (ends in ?embedded=true)│
+  │  REPLACE_GOOGLE_FORM_LINK       → Google Form > Send > link  │
+  │  REPLACE_PHONE_E164 / REPLACE_PHONE_DISPLAY                  │
+  │  REPLACE_EMAIL                                               │
+  │  REPLACE_LINKEDIN_URL / REPLACE_FACEBOOK_URL                 │
+  │  REPLACE_GOOGLE_REVIEW_LINK     → GBP dashboard > Get reviews│
+  └──────────────────────────────────────────────────────────────┘
+-->
+
+<title>Soarify | Free Google Business Profile Audit</title>
+<meta name="description" content="Request a free Google Business Profile audit from Soarify — local SEO and GBP optimization for service businesses." />
+<meta name="robots" content="noindex, follow" />
+<link rel="canonical" href="https://soarify.net/tap.html" />
+<meta name="theme-color" content="#0b0f14" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Lora:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="icon" type="image/png" href="assets/Soarify_Logo_Dark.png" />
+
+<style>
+  :root {
+    --bg: #0b0f14;
+    --card: rgba(255,255,255,0.04);
+    --border: rgba(255,255,255,0.10);
+    --text: #e8e8e8;
+    --text-dim: #9aa3ad;
+    --heading: #ffffff;
+    --accent: #1D9E75;
+    --accent-hover: #22b886;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    min-height: 100vh;
+    background:
+      radial-gradient(ellipse at 50% -10%, rgba(29,158,117,0.18), transparent 55%),
+      var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, sans-serif;
+    line-height: 1.5;
+    display: flex;
+    justify-content: center;
+    padding: 40px 18px 56px;
+  }
+
+  .tap { width: 100%; max-width: 440px; text-align: center; }
+
+  .logo { height: 72px; width: auto; max-width: 100%; margin: 0 auto 22px; display: block; }
+
+  h1 {
+    font-family: 'Lora', Georgia, serif;
+    font-size: 1.9rem;
+    font-weight: 700;
+    color: var(--heading);
+    line-height: 1.2;
+    margin-bottom: 10px;
+  }
+
+  .tagline {
+    color: var(--text-dim);
+    font-size: 0.97rem;
+    max-width: 360px;
+    margin: 0 auto 26px;
+  }
+
+  /* ── Buttons ── */
+  .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+
+  .btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 15px 16px;
+    border-radius: 12px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    text-decoration: none;
+    border: 1px solid var(--border);
+    color: var(--heading);
+    background: var(--card);
+    transition: transform 0.15s, background 0.2s, border-color 0.2s;
+    cursor: pointer;
+  }
+
+  .btn:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.22); }
+  .btn:active { transform: scale(0.98); }
+
+  .btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    width: 100%;
+    padding: 17px 16px;
+    font-size: 1.05rem;
+    margin-bottom: 10px;
+    box-shadow: 0 8px 24px rgba(29,158,117,0.28);
+  }
+
+  .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+
+  /* ── Link list ── */
+  .links { display: grid; gap: 10px; margin: 22px 0 0; text-align: left; }
+
+  .link-item {
+    display: grid;
+    grid-template-columns: 40px 1fr;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    text-decoration: none;
+    color: var(--text);
+    transition: background 0.2s, border-color 0.2s;
+  }
+
+  .link-item:hover { background: rgba(255,255,255,0.08); border-color: rgba(29,158,117,0.5); }
+
+  .link-icon {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    background: rgba(29,158,117,0.14);
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .link-icon svg { width: 20px; height: 20px; stroke: var(--accent); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  .link-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--text-dim); display: block; }
+  .link-value { font-size: 0.95rem; font-weight: 500; color: var(--heading); word-break: break-word; }
+
+  /* ── Audit form section ── */
+  .audit {
+    margin-top: 34px;
+    padding: 26px 20px 20px;
+    border: 1px solid var(--border);
+    border-top: 3px solid var(--accent);
+    border-radius: 0 0 16px 16px;
+    background: var(--card);
+    text-align: left;
+    scroll-margin-top: 20px;
+  }
+
+  .audit[hidden] { display: none; }
+
+  .audit h2 {
+    font-family: 'Lora', Georgia, serif;
+    font-size: 1.4rem;
+    color: var(--heading);
+    margin-bottom: 8px;
+  }
+
+  .audit p { color: var(--text-dim); font-size: 0.92rem; margin-bottom: 16px; }
+
+  .audit ul { list-style: none; margin-bottom: 18px; }
+  .audit li { font-size: 0.9rem; padding: 4px 0 4px 24px; position: relative; color: var(--text); }
+  .audit li::before { content: "✓"; position: absolute; left: 0; color: var(--accent); font-weight: 700; }
+
+  .form-frame {
+    width: 100%;
+    height: 880px;
+    border: 0;
+    border-radius: 10px;
+    background: #fff;
+    display: block;
+  }
+
+  .form-fallback { text-align: center; margin-top: 14px; font-size: 0.85rem; color: var(--text-dim); }
+  .form-fallback a { color: var(--accent); font-weight: 600; text-decoration: none; }
+  .form-fallback a:hover { text-decoration: underline; }
+
+  footer { margin-top: 30px; font-size: 0.8rem; color: var(--text-dim); }
+  footer a { color: var(--text-dim); text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<main class="tap">
+
+  <img class="logo" src="assets/Soarify_Logo_Dark.png" alt="Soarify" />
+  
+  <p class="tagline">Google Business Profile optimization and local SEO that helps service businesses rise above their competition.</p>
+
+  <a class="btn btn-primary" href="#audit" id="cta-audit" aria-controls="audit" aria-expanded="false">Get My Free GBP Audit →</a>
+
+  <div class="btn-row">
+    <a class="btn" href="soarify.vcf" download id="cta-save">Save my contact</a>
+    <a class="btn" href="tel:+15593467123" id="cta-call">Call me</a>
+  </div>
+
+  <div class="links">
+    <a class="link-item" href="tel:+15593467123">
+      <span class="link-icon"><svg viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg></span>
+      <span><span class="link-label">Call</span><span class="link-value">+1 (559) 346-7123</span></span>
+    </a>
+
+    <a class="link-item" href="mailto:info@soarify.net">
+      <span class="link-icon"><svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>
+      <span><span class="link-label">Email</span><span class="link-value">info@soarify.net</span></span>
+    </a>
+
+    <a class="link-item" href="https://soarify.net/">
+      <span class="link-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/></svg></span>
+      <span><span class="link-label">Website</span><span class="link-value">soarify.net</span></span>
+    </a>
+
+    <a class="link-item" href="https://www.linkedin.com/in/austin-hale-313152412/" target="_blank" rel="noopener">
+      <span class="link-icon"><svg viewBox="0 0 24 24"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6zM2 9h4v12H2zM4 2a2 2 0 1 1 0 4 2 2 0 0 1 0-4z"/></svg></span>
+      <span><span class="link-label">LinkedIn</span><span class="link-value">Connect with us</span></span>
+    </a>
+
+    <a class="link-item" href="https://www.facebook.com/profile.php?id=61589794946638" target="_blank" rel="noopener">
+      <span class="link-icon"><svg viewBox="0 0 24 24"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg></span>
+      <span><span class="link-label">Facebook</span><span class="link-value">Follow Soarify</span></span>
+    </a>
+
+    <a class="link-item" href="https://g.page/r/CWANUsNbIFLZEBM/review" target="_blank" rel="noopener">
+      <span class="link-icon"><svg viewBox="0 0 24 24"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg></span>
+      <span><span class="link-label">Google</span><span class="link-value">Leave a review</span></span>
+    </a>
+  </div>
+
+  <!-- ── Free audit form (Google Form) ── -->
+  <section class="audit" id="audit" hidden>
+    <h2>Request Your Free GBP Audit</h2>
+    <p>Tell us a little about your business and we'll review your Google Business Profile and send back a clear, prioritized list of what to fix first.</p>
+    <ul>
+      <li>Category, description, and service-area review</li>
+      <li>Review profile and response check</li>
+      <li>How you compare to the top local pack competitors</li>
+    </ul>
+
+    <iframe class="form-frame" id="audit-form" 
+            src="https://docs.google.com/forms/d/e/1FAIpQLSeVRT9w0wPBuXaR0gwcgYOblK42U4DM9aGmHdEi0mzxdIHsAg/viewform?embedded=true" 
+            width="640" 
+            height="1680" 
+            frameborder="0" 
+            marginheight="0" 
+            marginwidth="0"
+            title="Free Google Business Profile audit request form"
+            loading="lazy">Loading…</iframe>
+
+    <p class="form-fallback">Form not loading? <a href="https://docs.google.com/forms/d/e/1FAIpQLSeVRT9w0wPBuXaR0gwcgYOblK42U4DM9aGmHdEi0mzxdIHsAg/viewform?usp=publish-editor" target="_blank" rel="noopener">Open it in a new tab</a>.</p>
+  </section>
+
+  <footer>
+    Soarify Digital Marketing, LLC · <a href="privacy-policy.html">Privacy Policy</a>
+  </footer>
+
+</main>
+
+<script>
+  // Keep the audit form hidden until "Get My Free GBP Audit" is tapped
+  (function () {
+    var cta = document.getElementById('cta-audit');
+    var section = document.getElementById('audit');
+
+    function openAudit(scroll) {
+      section.hidden = false;
+      cta.setAttribute('aria-expanded', 'true');
+      if (scroll) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    cta.addEventListener('click', function (e) {
+      e.preventDefault();
+      openAudit(true);
+    });
+
+    // Direct links to tap.html#audit open the form too
+    if (location.hash === '#audit') openAudit(false);
+  })();
+
+  // Track which button people tap (shows up as events in Google Analytics)
+  document.querySelectorAll('.btn, .link-item').forEach(function (el) {
+    el.addEventListener('click', function () {
+      var label = (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+      if (typeof gtag === 'function') gtag('event', 'tap_page_click', { link_label: label });
+    });
+  });
+</script>
+</body>
+</html>
