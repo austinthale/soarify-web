@@ -29,7 +29,7 @@
 <title>Soarify | Free Google Business Profile Audit</title>
 <meta name="description" content="Request a free Google Business Profile audit from Soarify — local SEO and GBP optimization for service businesses." />
 <meta name="robots" content="noindex, follow" />
-<link rel="canonical" href="https://soarify.net/tap.html" />
+<link rel="canonical" href="https://soarify.net/tap" />
 <meta name="theme-color" content="#0b0f14" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -39,14 +39,18 @@
 
 <style>
   :root {
-    --bg: #0b0f14;
-    --card: rgba(255,255,255,0.04);
-    --border: rgba(255,255,255,0.10);
-    --text: #e8e8e8;
-    --text-dim: #9aa3ad;
+    --bg: #05091a;
+    --bg-elev: #0b1230;
+    --card: #0f1838;
+    --card-hover: #142046;
+    --border: rgba(96, 165, 250, 0.12);
+    --border-strong: rgba(96, 165, 250, 0.28);
+    --text: #e8edff;
+    --text-dim: #a6b0d4;
     --heading: #ffffff;
-    --accent: #1D9E75;
-    --accent-hover: #22b886;
+    --accent: #2563eb;
+    --accent-hover: #3b82f6;
+    --accent-soft: rgba(59, 130, 246, 0.12);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -56,7 +60,8 @@
   body {
     min-height: 100vh;
     background:
-      radial-gradient(ellipse at 50% -10%, rgba(29,158,117,0.18), transparent 55%),
+      radial-gradient(1200px 600px at 80% -200px, rgba(59, 130, 246, 0.16), transparent),
+      radial-gradient(900px 500px at -10% 30%, rgba(30, 64, 175, 0.14), transparent),
       var(--bg);
     color: var(--text);
     font-family: 'Inter', system-ui, sans-serif;
@@ -68,7 +73,7 @@
 
   .tap { width: 100%; max-width: 440px; text-align: center; }
 
-  .logo { height: 72px; width: auto; max-width: 100%; margin: 0 auto 22px; display: block; }
+  .logo { height: 200px; width: auto; max-width: 100%; margin: 0 auto 22px; display: block; }
 
   h1 {
     font-family: 'Lora', Georgia, serif;
@@ -95,33 +100,37 @@
     justify-content: center;
     gap: 8px;
     padding: 15px 16px;
-    border-radius: 12px;
+    border-radius: 999px;
     font-family: 'Inter', sans-serif;
     font-size: 0.95rem;
     font-weight: 600;
     text-decoration: none;
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-strong);
     color: var(--heading);
-    background: var(--card);
-    transition: transform 0.15s, background 0.2s, border-color 0.2s;
+    background: rgba(255,255,255,0.04);
+    transition: transform 0.15s, background 0.2s, border-color 0.2s, box-shadow 0.2s;
     cursor: pointer;
   }
 
-  .btn:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.22); }
+  .btn:hover { background: rgba(255,255,255,0.08); border-color: rgba(96, 165, 250, 0.42); box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.12); }
   .btn:active { transform: scale(0.98); }
 
   .btn-primary {
-    background: var(--accent);
-    border-color: var(--accent);
+    background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
+    border-color: transparent;
     color: #fff;
     width: 100%;
     padding: 17px 16px;
     font-size: 1.05rem;
     margin-bottom: 10px;
-    box-shadow: 0 8px 24px rgba(29,158,117,0.28);
+    box-shadow: 0 12px 28px -10px rgba(59, 130, 246, 0.55);
   }
 
-  .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+  .btn-primary:hover {
+    background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 50%, #60a5fa 100%);
+    border-color: transparent;
+    box-shadow: 0 18px 36px -10px rgba(59, 130, 246, 0.7);
+  }
 
   /* ── Link list ── */
   .links { display: grid; gap: 10px; margin: 22px 0 0; text-align: left; }
@@ -140,12 +149,17 @@
     transition: background 0.2s, border-color 0.2s;
   }
 
-  .link-item:hover { background: rgba(255,255,255,0.08); border-color: rgba(29,158,117,0.5); }
+  .link-item:hover {
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(96, 165, 250, 0.42);
+    box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.08);
+  }
 
   .link-icon {
     width: 40px; height: 40px;
     border-radius: 10px;
-    background: rgba(29,158,117,0.14);
+    background: rgba(59, 130, 246, 0.12);
+    border: 1px solid rgba(96, 165, 250, 0.18);
     display: flex; align-items: center; justify-content: center;
   }
 
